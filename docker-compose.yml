@@ -1,0 +1,71 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:5.7.11
+    container_name: mysql
+    restart: always
+    command: [
+      '--default-authentication-plugin=mysql_native_password',
+      '--character-set-server=utf8mb4',
+      '--collation-server=utf8mb4_general_ci',
+      '--explicit_defaults_for_timestamp=true',
+      '--lower_case_table_names=1'
+    ]
+    env_file:
+      - env/mysql.env
+    ports:
+      - "3306:3306"
+    volumes:
+      - "./mysql-data:/var/lib/mysql"
+      - "./mysql-conf:/etc/mysql"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h","localhost" ,"uroot","-pr2to%yz%a" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      
+  backend:
+    image: openjdk:8-jre
+    restart: always
+    container_name: backend
+    working_dir: /app
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "8001:8001" #后端端口
+    volumes:
+      - "./backend/gserver-1.0.0-SNAPSHOT.jar:/app/gserver-1.0.0-SNAPSHOT.jar"
+      - "./backend/application.yml:/app/application.yml"
+      - "./backend/application-dev.yml:/app/application-dev.yml"
+    command:
+      - java
+      - -jar
+      - gserver-1.0.0-SNAPSHOT.jar
+    depends_on:
+      - mysql
+      
+  nginx: # 服务名称，用户自定义
+    image: nginx  # 镜像版本
+    container_name: nginx
+    ports:
+      - "8002:8002"  # 暴露端口与监听端口与nginx.conf中监听一致
+    volumes: # 挂载
+      - "./frontend/dist:/usr/share/nginx/html"
+      - "./frontend/nginx.conf:/etc/nginx/nginx.conf"
+      - "./logs:/etc/nginx/logs" # 这行会创建并映射日志目录
+    privileged: true # 这个必须要，解决nginx的文件调用的权限问题
+    depends_on:
+      - backend
+      
+  redis:
+    image: redis:4
+    container_name: redis
+    restart: always
+    command: redis-server --requirepass bW9Ivzt0CAQdoJTDZ2wAnduvi #设置redis密码
+    ports:
+      - "6379:6379"  #端口映射
+    environment:
+      TZ: "Asia/Shanghai"
+networks:
+  his-net:
+    name: hisapp     
